@@ -30,11 +30,15 @@ var pdfjsDisplaySVG = require("./display/svg.js");
 const pdfjsDisplayWorkerOptions = require("./display/worker_options.js");
 const pdfjsDisplayAPICompatibility = require("./display/api_compatibility.js");
 
-if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
-  const { isNodeJS } = require("./shared/is_node.js");
-  if (isNodeJS) {
-    const PDFNodeStream = require("./display/node_stream.js").PDFNodeStream;
-    pdfjsDisplayAPI.setPDFNetworkStreamFactory(params => {
+if (typeof PDFJSDev === 'undefined' || PDFJSDev.test('GENERIC')) {
+  const { isNodeJS, isElectronOrNwJs } = require('./shared/is_node.js');
+  if (isNodeJS || isElectronOrNwJs) {
+    let PDFNetworkStream = require('./display/network.js').PDFNetworkStream;
+    let PDFNodeStream = require('./display/node_stream.js').PDFNodeStream;
+    pdfjsDisplayAPI.setPDFNetworkStreamFactory((params) => {
+      if (!pdfjsDisplayDisplayUtils.isValidFetchUrl(params.url) && isElectronOrNwJs) {
+          return new PDFNetworkStream(params);
+      }
       return new PDFNodeStream(params);
     });
   } else {
