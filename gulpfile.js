@@ -92,7 +92,7 @@ var CSS_VARIABLES_CONFIG = {
 
 var DEFINES = {
   PRODUCTION: true,
-  SKIP_BABEL: true,
+  SKIP_BABEL: false, // true,
   TESTING: false,
   // The main build targets:
   GENERIC: false,
