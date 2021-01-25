@@ -62,6 +62,8 @@ const pdfjsVersion =
 const pdfjsBuild =
   typeof PDFJSDev !== "undefined" ? PDFJSDev.eval("BUNDLE_BUILD") : void 0;
 
+const { isNodeJS, isElectronOrNwJs } = require("./shared/is_node.js");
+
 if (typeof PDFJSDev === "undefined" || !PDFJSDev.test("PRODUCTION")) {
   const streamsPromise = Promise.all([
     import("pdfjs/display/network.js"),
@@ -77,7 +79,6 @@ if (typeof PDFJSDev === "undefined" || !PDFJSDev.test("PRODUCTION")) {
     });
   });
 } else if (PDFJSDev.test("GENERIC")) {
-    const { isNodeJS, isElectronOrNwJs } = require("./shared/is_node.js");
   if (isNodeJS || isElectronOrNwJs) {
     const PDFNodeStream = require("./display/node_stream.js").PDFNodeStream;
     setPDFNetworkStreamFactory(params => {
