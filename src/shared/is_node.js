@@ -19,7 +19,8 @@ const hasNodeProcess = typeof process === 'object' &&
 
 // NW.js / Electron is a browser context, but copies some Node.js objects; see
 // http://docs.nwjs.io/en/latest/For%20Users/Advanced/JavaScript%20Contexts%20in%20NW.js/#access-nodejs-and-nwjs-api-in-browser-context
-// https://electronjs.org/docs/api/process#processversionselectron
+// https://www.electronjs.org/docs/api/process#processversionselectron-readonly
+// https://www.electronjs.org/docs/api/process#processtype-readonly
 const isElectronOrNwJs = hasNodeProcess &&
   (process.versions['electron'] || process.versions['nw']);
 

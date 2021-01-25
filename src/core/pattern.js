@@ -38,6 +38,7 @@ var ShadingType = {
 
 var Pattern = (function PatternClosure() {
   // Constructor should define this.getPattern
+  // eslint-disable-next-line no-shadow
   function Pattern() {
     unreachable("should not call Pattern constructor");
   }
@@ -50,13 +51,14 @@ var Pattern = (function PatternClosure() {
     },
   };
 
-  Pattern.parseShading = function(
+  Pattern.parseShading = function (
     shading,
     matrix,
     xref,
     res,
     handler,
-    pdfFunctionFactory
+    pdfFunctionFactory,
+    localColorSpaceCache
   ) {
     var dict = isStream(shading) ? shading.dict : shading;
     var type = dict.get("ShadingType");
@@ -71,7 +73,8 @@ var Pattern = (function PatternClosure() {
             matrix,
             xref,
             res,
-            pdfFunctionFactory
+            pdfFunctionFactory,
+            localColorSpaceCache
           );
         case ShadingType.FREE_FORM_MESH:
         case ShadingType.LATTICE_FORM_MESH:
@@ -82,7 +85,8 @@ var Pattern = (function PatternClosure() {
             matrix,
             xref,
             res,
-            pdfFunctionFactory
+            pdfFunctionFactory,
+            localColorSpaceCache
           );
         default:
           throw new FormatError("Unsupported ShadingType: " + type);
@@ -110,13 +114,25 @@ Shadings.SMALL_NUMBER = 1e-6;
 // Radial and axial shading have very similar implementations
 // If needed, the implementations can be broken into two classes
 Shadings.RadialAxial = (function RadialAxialClosure() {
-  function RadialAxial(dict, matrix, xref, res, pdfFunctionFactory) {
+  function RadialAxial(
+    dict,
+    matrix,
+    xref,
+    resources,
+    pdfFunctionFactory,
+    localColorSpaceCache
+  ) {
     this.matrix = matrix;
     this.coordsArr = dict.getArray("Coords");
     this.shadingType = dict.get("ShadingType");
     this.type = "Pattern";
-    var cs = dict.get("ColorSpace", "CS");
-    cs = ColorSpace.parse(cs, xref, res, pdfFunctionFactory);
+    const cs = ColorSpace.parse({
+      cs: dict.getRaw("ColorSpace") || dict.getRaw("CS"),
+      xref,
+      resources,
+      pdfFunctionFactory,
+      localColorSpaceCache,
+    });
     this.cs = cs;
     const bbox = dict.getArray("BBox");
     if (Array.isArray(bbox) && bbox.length === 4) {
@@ -162,7 +178,7 @@ Shadings.RadialAxial = (function RadialAxialClosure() {
     this.extendStart = extendStart;
     this.extendEnd = extendEnd;
 
-    var fnObj = dict.get("Function");
+    var fnObj = dict.getRaw("Function");
     var fn = pdfFunctionFactory.createFromArray(fnObj);
 
     // 10 samples seems good enough for now, but probably won't work
@@ -450,6 +466,8 @@ Shadings.Mesh = (function MeshClosure() {
       return lut;
     }
     var cache = [];
+
+    // eslint-disable-next-line no-shadow
     return function getB(count) {
       if (!cache[count]) {
         cache[count] = buildB(count);
@@ -827,7 +845,14 @@ Shadings.Mesh = (function MeshClosure() {
     }
   }
 
-  function Mesh(stream, matrix, xref, res, pdfFunctionFactory) {
+  function Mesh(
+    stream,
+    matrix,
+    xref,
+    resources,
+    pdfFunctionFactory,
+    localColorSpaceCache
+  ) {
     if (!isStream(stream)) {
       throw new FormatError("Mesh data is not a stream");
     }
@@ -841,14 +866,19 @@ Shadings.Mesh = (function MeshClosure() {
     } else {
       this.bbox = null;
     }
-    var cs = dict.get("ColorSpace", "CS");
-    cs = ColorSpace.parse(cs, xref, res, pdfFunctionFactory);
+    const cs = ColorSpace.parse({
+      cs: dict.getRaw("ColorSpace") || dict.getRaw("CS"),
+      xref,
+      resources,
+      pdfFunctionFactory,
+      localColorSpaceCache,
+    });
     this.cs = cs;
     this.background = dict.has("Background")
       ? cs.getRgb(dict.get("Background"), 0)
       : null;
 
-    var fnObj = dict.get("Function");
+    var fnObj = dict.getRaw("Function");
     var fn = fnObj ? pdfFunctionFactory.createFromArray(fnObj) : null;
 
     this.coords = [];

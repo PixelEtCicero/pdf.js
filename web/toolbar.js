@@ -137,17 +137,17 @@ class Toolbar {
       });
     }
     // The non-button elements within the toolbar.
-    pageNumber.addEventListener("click", function() {
+    pageNumber.addEventListener("click", function () {
       this.select();
     });
-    pageNumber.addEventListener("change", function() {
+    pageNumber.addEventListener("change", function () {
       self.eventBus.dispatch("pagenumberchanged", {
         source: self,
         value: this.value,
       });
     });
 
-    scaleSelect.addEventListener("change", function() {
+    scaleSelect.addEventListener("change", function () {
       if (this.value === "custom") {
         return;
       }
@@ -271,7 +271,7 @@ class Toolbar {
       }
     }
     const overflow = SCALE_SELECT_WIDTH - SCALE_SELECT_CONTAINER_WIDTH;
-    maxWidth += 1.5 * overflow;
+    maxWidth += 2 * overflow;
 
     if (maxWidth > SCALE_SELECT_CONTAINER_WIDTH) {
       items.scaleSelect.style.width = `${maxWidth + overflow}px`;

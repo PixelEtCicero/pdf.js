@@ -12,9 +12,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* eslint-disable no-unsanitized/method */
 
-import { assert, ImageKind, OPS } from "../shared/util.js";
+import { assert, ImageKind, OPS, warn } from "../shared/util.js";
 
 var QueueOptimizer = (function QueueOptimizerClosure() {
   function addState(parentState, pattern, checkFn, iterateFn, processFn) {
@@ -230,13 +229,13 @@ var QueueOptimizer = (function QueueOptimizerClosure() {
       var isSameImage = false;
       var iTransform, transformArgs;
       var firstPIMXOArg0 = argsArray[iFirstPIMXO][0];
-      if (
-        argsArray[iFirstTransform][1] === 0 &&
-        argsArray[iFirstTransform][2] === 0
-      ) {
+      const firstTransformArg0 = argsArray[iFirstTransform][0],
+        firstTransformArg1 = argsArray[iFirstTransform][1],
+        firstTransformArg2 = argsArray[iFirstTransform][2],
+        firstTransformArg3 = argsArray[iFirstTransform][3];
+
+      if (firstTransformArg1 === firstTransformArg2) {
         isSameImage = true;
-        var firstTransformArg0 = argsArray[iFirstTransform][0];
-        var firstTransformArg3 = argsArray[iFirstTransform][3];
         iTransform = iFirstTransform + 4;
         var iPIMXO = iFirstPIMXO + 4;
         for (q = 1; q < count; q++, iTransform += 4, iPIMXO += 4) {
@@ -244,8 +243,8 @@ var QueueOptimizer = (function QueueOptimizerClosure() {
           if (
             argsArray[iPIMXO][0] !== firstPIMXOArg0 ||
             transformArgs[0] !== firstTransformArg0 ||
-            transformArgs[1] !== 0 ||
-            transformArgs[2] !== 0 ||
+            transformArgs[1] !== firstTransformArg1 ||
+            transformArgs[2] !== firstTransformArg2 ||
             transformArgs[3] !== firstTransformArg3
           ) {
             if (q < MIN_IMAGES_IN_MASKS_BLOCK) {
@@ -273,6 +272,8 @@ var QueueOptimizer = (function QueueOptimizerClosure() {
         argsArray.splice(iFirstSave, count * 4, [
           firstPIMXOArg0,
           firstTransformArg0,
+          firstTransformArg1,
+          firstTransformArg2,
           firstTransformArg3,
           positions,
         ]);
@@ -305,7 +306,7 @@ var QueueOptimizer = (function QueueOptimizerClosure() {
   addState(
     InitialState,
     [OPS.save, OPS.transform, OPS.paintImageXObject, OPS.restore],
-    function(context) {
+    function (context) {
       var argsArray = context.argsArray;
       var iFirstTransform = context.iCurr - 2;
       return (
@@ -352,7 +353,7 @@ var QueueOptimizer = (function QueueOptimizerClosure() {
       }
       throw new Error(`iterateImageGroup - invalid pos: ${pos}`);
     },
-    function(context, i) {
+    function (context, i) {
       var MIN_IMAGES_IN_BLOCK = 3;
       var MAX_IMAGES_IN_BLOCK = 1000;
 
@@ -437,7 +438,7 @@ var QueueOptimizer = (function QueueOptimizerClosure() {
       }
       throw new Error(`iterateShowTextGroup - invalid pos: ${pos}`);
     },
-    function(context, i) {
+    function (context, i) {
       var MIN_CHARS_IN_BLOCK = 3;
       var MAX_CHARS_IN_BLOCK = 1000;
 
@@ -491,6 +492,7 @@ var QueueOptimizer = (function QueueOptimizerClosure() {
     }
   );
 
+  // eslint-disable-next-line no-shadow
   function QueueOptimizer(queue) {
     this.queue = queue;
     this.state = null;
@@ -585,6 +587,7 @@ var QueueOptimizer = (function QueueOptimizerClosure() {
 })();
 
 var NullOptimizer = (function NullOptimizerClosure() {
+  // eslint-disable-next-line no-shadow
   function NullOptimizer(queue) {
     this.queue = queue;
   }
@@ -607,7 +610,8 @@ var OperatorList = (function OperatorListClosure() {
   var CHUNK_SIZE = 1000;
   var CHUNK_SIZE_ABOUT = CHUNK_SIZE - 5; // close to chunk size
 
-  function OperatorList(intent, streamSink, pageIndex) {
+  // eslint-disable-next-line no-shadow
+  function OperatorList(intent, streamSink) {
     this._streamSink = streamSink;
     this.fnArray = [];
     this.argsArray = [];
@@ -616,10 +620,8 @@ var OperatorList = (function OperatorListClosure() {
     } else {
       this.optimizer = new NullOptimizer(this);
     }
-    this.dependencies = Object.create(null);
+    this.dependencies = new Set();
     this._totalLength = 0;
-    this.pageIndex = pageIndex;
-    this.intent = intent;
     this.weight = 0;
     this._resolved = streamSink ? null : Promise.resolve();
   }
@@ -658,21 +660,27 @@ var OperatorList = (function OperatorListClosure() {
     },
 
     addDependency(dependency) {
-      if (dependency in this.dependencies) {
+      if (this.dependencies.has(dependency)) {
         return;
       }
-      this.dependencies[dependency] = true;
+      this.dependencies.add(dependency);
       this.addOp(OPS.dependency, [dependency]);
     },
 
     addDependencies(dependencies) {
-      for (var key in dependencies) {
-        this.addDependency(key);
+      for (const dependency of dependencies) {
+        this.addDependency(dependency);
       }
     },
 
     addOpList(opList) {
-      Object.assign(this.dependencies, opList.dependencies);
+      if (!(opList instanceof OperatorList)) {
+        warn('addOpList - ignoring invalid "opList" parameter.');
+        return;
+      }
+      for (const dependency of opList.dependencies) {
+        this.dependencies.add(dependency);
+      }
       for (var i = 0, ii = opList.length; i < ii; i++) {
         this.addOp(opList.fnArray[i], opList.argsArray[i]);
       }
@@ -730,7 +738,7 @@ var OperatorList = (function OperatorListClosure() {
         this._transfers
       );
 
-      this.dependencies = Object.create(null);
+      this.dependencies.clear();
       this.fnArray.length = 0;
       this.argsArray.length = 0;
       this.weight = 0;

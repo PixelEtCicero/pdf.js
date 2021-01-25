@@ -13,11 +13,8 @@
  * limitations under the License.
  */
 
-import {
-  apiCompatibilityParams,
-  createObjectURL,
-  createValidAbsoluteUrl,
-} from "pdfjs-lib";
+import { createObjectURL, createValidAbsoluteUrl } from "pdfjs-lib";
+import { viewerCompatibilityParams } from "./viewer_compatibility.js";
 
 if (typeof PDFJSDev !== "undefined" && !PDFJSDev.test("CHROME || GENERIC")) {
   throw new Error(
@@ -25,9 +22,6 @@ if (typeof PDFJSDev !== "undefined" && !PDFJSDev.test("CHROME || GENERIC")) {
       "outside CHROME and GENERIC builds."
   );
 }
-
-const DISABLE_CREATE_OBJECT_URL =
-  apiCompatibilityParams.disableCreateObjectURL || false;
 
 function download(blobUrl, filename) {
   const a = document.createElement("a");
@@ -49,10 +43,6 @@ function download(blobUrl, filename) {
 }
 
 class DownloadManager {
-  constructor({ disableCreateObjectURL = DISABLE_CREATE_OBJECT_URL }) {
-    this.disableCreateObjectURL = disableCreateObjectURL;
-  }
-
   downloadUrl(url, filename) {
     if (!createValidAbsoluteUrl(url, "http://example.com")) {
       return; // restricted/invalid URL
@@ -69,12 +59,18 @@ class DownloadManager {
     const blobUrl = createObjectURL(
       data,
       contentType,
-      this.disableCreateObjectURL
+      viewerCompatibilityParams.disableCreateObjectURL
     );
     download(blobUrl, filename);
   }
 
-  download(blob, url, filename) {
+  /**
+   * @param sourceEventType {string} Used to signal what triggered the download.
+   *   The version of PDF.js integrated with Firefox uses this to to determine
+   *   which dialog to show. "save" triggers "save as" and "download" triggers
+   *   the "open with" dialog.
+   */
+  download(blob, url, filename, sourceEventType = "download") {
     if (navigator.msSaveBlob) {
       // IE10 / IE11
       if (!navigator.msSaveBlob(blob, filename)) {
@@ -83,7 +79,7 @@ class DownloadManager {
       return;
     }
 
-    if (this.disableCreateObjectURL) {
+    if (viewerCompatibilityParams.disableCreateObjectURL) {
       // URL.createObjectURL is not supported
       this.downloadUrl(url, filename);
       return;

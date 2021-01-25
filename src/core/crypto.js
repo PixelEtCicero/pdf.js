@@ -27,6 +27,7 @@ import { isDict, isName, Name } from "./primitives.js";
 import { DecryptStream } from "./stream.js";
 
 var ARCFourCipher = (function ARCFourCipherClosure() {
+  // eslint-disable-next-line no-shadow
   function ARCFourCipher(key) {
     this.a = 0;
     this.b = 0;
@@ -72,6 +73,7 @@ var ARCFourCipher = (function ARCFourCipherClosure() {
     },
   };
   ARCFourCipher.prototype.decryptBlock = ARCFourCipher.prototype.encryptBlock;
+  ARCFourCipher.prototype.encrypt = ARCFourCipher.prototype.encryptBlock;
 
   return ARCFourCipher;
 })();
@@ -177,6 +179,7 @@ var calculateMD5 = (function calculateMD5Closure() {
   return hash;
 })();
 var Word64 = (function Word64Closure() {
+  // eslint-disable-next-line no-shadow
   function Word64(highInteger, lowInteger) {
     this.high = highInteger | 0;
     this.low = lowInteger | 0;
@@ -690,10 +693,14 @@ var calculateSHA384 = (function calculateSHA384Closure() {
   return hash;
 })();
 var NullCipher = (function NullCipherClosure() {
+  // eslint-disable-next-line no-shadow
   function NullCipher() {}
 
   NullCipher.prototype = {
     decryptBlock: function NullCipher_decryptBlock(data) {
+      return data;
+    },
+    encrypt: function NullCipher_encrypt(data) {
       return data;
     },
   };
@@ -1094,6 +1101,7 @@ class AESBaseCipher {
       if (bufferLength < 16) {
         continue;
       }
+
       for (let j = 0; j < 16; ++j) {
         buffer[j] ^= iv[j];
       }
@@ -1265,6 +1273,7 @@ var PDF17 = (function PDF17Closure() {
     return true;
   }
 
+  // eslint-disable-next-line no-shadow
   function PDF17() {}
 
   PDF17.prototype = {
@@ -1372,6 +1381,7 @@ var PDF20 = (function PDF20Closure() {
     return k.subarray(0, 32);
   }
 
+  // eslint-disable-next-line no-shadow
   function PDF20() {}
 
   function compareByteArrays(array1, array2) {
@@ -1446,6 +1456,7 @@ var PDF20 = (function PDF20Closure() {
 })();
 
 var CipherTransform = (function CipherTransformClosure() {
+  // eslint-disable-next-line no-shadow
   function CipherTransform(stringCipherConstructor, streamCipherConstructor) {
     this.StringCipherConstructor = stringCipherConstructor;
     this.StreamCipherConstructor = streamCipherConstructor;
@@ -1466,6 +1477,42 @@ var CipherTransform = (function CipherTransformClosure() {
       var cipher = new this.StringCipherConstructor();
       var data = stringToBytes(s);
       data = cipher.decryptBlock(data, true);
+      return bytesToString(data);
+    },
+    encryptString: function CipherTransform_encryptString(s) {
+      const cipher = new this.StringCipherConstructor();
+      if (cipher instanceof AESBaseCipher) {
+        // Append some chars equal to "16 - (M mod 16)"
+        // where M is the string length (see section 7.6.2 in PDF specification)
+        // to have a final string where the length is a multiple of 16.
+        const strLen = s.length;
+        const pad = 16 - (strLen % 16);
+        if (pad !== 16) {
+          s = s.padEnd(16 * Math.ceil(strLen / 16), String.fromCharCode(pad));
+        }
+
+        // Generate an initialization vector
+        const iv = new Uint8Array(16);
+        if (typeof crypto !== "undefined") {
+          crypto.getRandomValues(iv);
+        } else {
+          for (let i = 0; i < 16; i++) {
+            iv[i] = Math.floor(256 * Math.random());
+          }
+        }
+
+        let data = stringToBytes(s);
+        data = cipher.encrypt(data, iv);
+
+        const buf = new Uint8Array(16 + data.length);
+        buf.set(iv);
+        buf.set(data, 16);
+
+        return bytesToString(buf);
+      }
+
+      let data = stringToBytes(s);
+      data = cipher.encrypt(data);
       return bytesToString(data);
     },
   };
@@ -1661,6 +1708,7 @@ var CipherTransformFactory = (function CipherTransformFactoryClosure() {
 
   var identityName = Name.get("Identity");
 
+  // eslint-disable-next-line no-shadow
   function CipherTransformFactory(dict, fileId, password) {
     var filter = dict.get("Filter");
     if (!isName(filter, "Standard")) {

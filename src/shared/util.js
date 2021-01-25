@@ -19,12 +19,6 @@ import "./compatibility.js";
 const IDENTITY_MATRIX = [1, 0, 0, 1, 0, 0];
 const FONT_IDENTITY_MATRIX = [0.001, 0, 0, 0.001, 0, 0];
 
-const NativeImageDecoding = {
-  NONE: "none",
-  DECODE: "decode",
-  DISPLAY: "display",
-};
-
 // Permission flags from Table 22, Section 7.6.3.2 of the PDF specification.
 const PermissionFlag = {
   PRINT: 0x04,
@@ -288,12 +282,27 @@ const OPS = {
 };
 
 const UNSUPPORTED_FEATURES = {
+  /** @deprecated unused */
   unknown: "unknown",
   forms: "forms",
   javaScript: "javaScript",
   smask: "smask",
   shadingPattern: "shadingPattern",
+  /** @deprecated unused */
   font: "font",
+  errorTilingPattern: "errorTilingPattern",
+  errorExtGState: "errorExtGState",
+  errorXObject: "errorXObject",
+  errorFontLoadType3: "errorFontLoadType3",
+  errorFontState: "errorFontState",
+  errorFontMissing: "errorFontMissing",
+  errorFontTranslate: "errorFontTranslate",
+  errorColorSpace: "errorColorSpace",
+  errorOperatorList: "errorOperatorList",
+  errorFontToUnicode: "errorFontToUnicode",
+  errorFontLoadNative: "errorFontLoadNative",
+  errorFontGetPath: "errorFontGetPath",
+  errorMarkedContent: "errorMarkedContent",
 };
 
 const PasswordResponses = {
@@ -355,7 +364,7 @@ function isSameOrigin(baseUrl, otherUrl) {
   return base.origin === other.origin;
 }
 
-// Checks if URLs use one of the whitelisted protocols, e.g. to avoid XSS.
+// Checks if URLs use one of the allowed protocols, e.g. to avoid XSS.
 function _isValidProtocol(url) {
   if (!url) {
     return false;
@@ -404,7 +413,11 @@ function shadow(obj, prop, value) {
   return value;
 }
 
+/**
+ * @type {any}
+ */
 const BaseException = (function BaseExceptionClosure() {
+  // eslint-disable-next-line no-shadow
   function BaseException(message) {
     if (this.constructor === BaseException) {
       unreachable("Cannot initialize BaseException.");
@@ -455,6 +468,9 @@ class AbortException extends BaseException {}
 
 const NullCharactersRegExp = /\x00/g;
 
+/**
+ * @param {string} str
+ */
 function removeNullCharacters(str) {
   if (typeof str !== "string") {
     warn("The argument for removeNullCharacters must be a string.");
@@ -494,20 +510,21 @@ function stringToBytes(str) {
 
 /**
  * Gets length of the array (Array, Uint8Array, or string) in bytes.
- * @param {Array|Uint8Array|string} arr
+ * @param {Array<any>|Uint8Array|string} arr
  * @returns {number}
  */
 function arrayByteLength(arr) {
   if (arr.length !== undefined) {
     return arr.length;
   }
-  assert(arr.byteLength !== undefined);
+  assert(arr.byteLength !== undefined, "arrayByteLength - invalid argument.");
   return arr.byteLength;
 }
 
 /**
  * Combines array items (arrays) into single Uint8Array object.
- * @param {Array} arr - the array of the arrays (Array, Uint8Array, or string).
+ * @param {Array<Array<any>|Uint8Array|string>} arr - the array of the arrays
+ *   (Array, Uint8Array, or string).
  * @returns {Uint8Array}
  */
 function arraysToBytes(arr) {
@@ -776,19 +793,18 @@ function stringToPDFString(str) {
   return strBuf.join("");
 }
 
+function escapeString(str) {
+  // replace "(", ")" and "\" by "\(", "\)" and "\\"
+  // in order to write it in a PDF file.
+  return str.replace(/([\(\)\\])/g, "\\$1");
+}
+
 function stringToUTF8String(str) {
   return decodeURIComponent(escape(str));
 }
 
 function utf8StringToString(str) {
   return unescape(encodeURIComponent(str));
-}
-
-function isEmptyObj(obj) {
-  for (const key in obj) {
-    return false;
-  }
-  return true;
 }
 
 function isBool(v) {
@@ -811,16 +827,29 @@ function isArrayEqual(arr1, arr2) {
   if (arr1.length !== arr2.length) {
     return false;
   }
-  return arr1.every(function(element, index) {
+  return arr1.every(function (element, index) {
     return element === arr2[index];
   });
+}
+
+function getModificationDate(date = new Date(Date.now())) {
+  const buffer = [
+    date.getUTCFullYear().toString(),
+    (date.getUTCMonth() + 1).toString().padStart(2, "0"),
+    (date.getUTCDate() + 1).toString().padStart(2, "0"),
+    date.getUTCHours().toString().padStart(2, "0"),
+    date.getUTCMinutes().toString().padStart(2, "0"),
+    date.getUTCSeconds().toString().padStart(2, "0"),
+  ];
+
+  return buffer.join("");
 }
 
 /**
  * Promise Capability object.
  *
  * @typedef {Object} PromiseCapability
- * @property {Promise} promise - A Promise object.
+ * @property {Promise<any>} promise - A Promise object.
  * @property {boolean} settled - If the Promise has been fulfilled/rejected.
  * @property {function} resolve - Fulfills the Promise.
  * @property {function} reject - Rejects the Promise.
@@ -841,12 +870,12 @@ function createPromiseCapability() {
       return isSettled;
     },
   });
-  capability.promise = new Promise(function(resolve, reject) {
-    capability.resolve = function(data) {
+  capability.promise = new Promise(function (resolve, reject) {
+    capability.resolve = function (data) {
       isSettled = true;
       resolve(data);
     };
-    capability.reject = function(reason) {
+    capability.reject = function (reason) {
       isSettled = true;
       reject(reason);
     };
@@ -859,6 +888,7 @@ const createObjectURL = (function createObjectURLClosure() {
   const digits =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 
+  // eslint-disable-next-line no-shadow
   return function createObjectURL(data, contentType, forceDataSchema = false) {
     if (!forceDataSchema && URL.createObjectURL) {
       const blob = new Blob([data], { type: contentType });
@@ -901,7 +931,6 @@ export {
   AbortException,
   InvalidPDFException,
   MissingPDFException,
-  NativeImageDecoding,
   PasswordException,
   PasswordResponses,
   PermissionFlag,
@@ -917,12 +946,13 @@ export {
   bytesToString,
   createPromiseCapability,
   createObjectURL,
+  escapeString,
+  getModificationDate,
   getVerbosityLevel,
   info,
   isArrayBuffer,
   isArrayEqual,
   isBool,
-  isEmptyObj,
   isNum,
   isString,
   isSameOrigin,
