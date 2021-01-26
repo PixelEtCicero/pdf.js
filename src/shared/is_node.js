@@ -22,7 +22,7 @@ const hasNodeProcess = typeof process === 'object' &&
 // https://www.electronjs.org/docs/api/process#processversionselectron-readonly
 // https://www.electronjs.org/docs/api/process#processtype-readonly
 const isElectronOrNwJs = hasNodeProcess &&
-  (process.versions['electron'] || process.versions['nw']);
+  !!(process.versions['electron'] || process.versions['nw']);
 
 const isNodeJS = hasNodeProcess &&
   !isElectronOrNwJs;
