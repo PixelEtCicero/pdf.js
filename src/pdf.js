@@ -82,7 +82,12 @@ if (typeof PDFJSDev === "undefined" || !PDFJSDev.test("PRODUCTION")) {
 } else if (PDFJSDev.test("GENERIC")) {
   if (isNodeJS || isElectronOrNwJs) {
     const PDFNodeStream = require("./display/node_stream.js").PDFNodeStream;
+    const PDFNetworkStream = require("./display/network.js").PDFNetworkStream;
     setPDFNetworkStreamFactory(params => {
+      if (params.url.indexOf("blob:") === 0) {
+        return new PDFNetworkStream(params);
+      }
+
       return new PDFNodeStream(params);
     });
   } else {
